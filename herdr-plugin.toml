@@ -1,0 +1,22 @@
+id = "finder-reveal"
+name = "finder-reveal"
+version = "0.1.0"
+min_herdr_version = "0.7.5"
+platforms = ["macos"]
+
+[[actions]]
+id = "reveal"
+title = "Reveal in Finder"
+description = "Reveal the clicked local path in Finder"
+command = ["/bin/sh", "-c", "exec \"$HERDR_PLUGIN_ROOT/reveal.sh\""]
+contexts = ["pane"]
+platforms = ["macos"]
+
+# Herdr uses the Rust `regex` crate: no look-around, so a path cannot be
+# excluded by what precedes it. reveal.sh compensates with an existence check.
+[[link_handlers]]
+id = "local-path"
+title = "Reveal in Finder"
+action = "reveal"
+platforms = ["macos"]
+pattern = "(?:~|\\.\\.?)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}|/(?:Users|Applications|Volumes|opt|tmp|var|etc|private)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}"
