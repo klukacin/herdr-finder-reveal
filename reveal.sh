@@ -14,6 +14,10 @@ say() { printf '%s\n' "$*"; }
 p="${HERDR_PLUGIN_CLICKED_URL:-}"
 [ -n "$p" ] || { say "skip: no clicked url"; exit 0; }
 
+# A scheme means this is not a local path. The regex only ever matches a path
+# segment, but a whole URL arriving here must not be joined onto the pane cwd.
+case "$p" in *://*) say "skip: not a local path: $p"; exit 0 ;; esac
+
 # Tilde expansion. Ghostty had the same bug (ghostty-org/ghostty#10863):
 # URL(filePath:) treats "~" as a literal directory.
 case "$p" in
