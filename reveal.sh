@@ -14,9 +14,23 @@ say() { printf '%s\n' "$*"; }
 p="${HERDR_PLUGIN_CLICKED_URL:-}"
 [ -n "$p" ] || { say "skip: no clicked url"; exit 0; }
 
-# A scheme means this is not a local path. The regex only ever matches a path
-# segment, but a whole URL arriving here must not be joined onto the pane cwd.
-case "$p" in *://*) say "skip: not a local path: $p"; exit 0 ;; esac
+# Herdr has no plain-text link scanner: only OSC 8 hyperlinks are clickable, so
+# a file link normally arrives percent-encoded as file://host/path. Decode it,
+# and reject every other scheme so a URL is never joined onto the pane cwd.
+case "$p" in
+  file://*)
+    rest=${p#file://}
+    case "$rest" in
+      /*) ;;                  # file:///path -> empty host
+      *) rest=/${rest#*/} ;;  # file://localhost/path -> drop the host
+    esac
+    # Escape backslashes before %XX -> \xXX, so printf %b cannot eat a literal
+    # backslash that belongs to the filename.
+    p=$(printf '%s' "$rest" | sed -e 's/\\/\\\\/g' -e 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')
+    p=$(printf '%b' "$p")
+    ;;
+  *://*) say "skip: not a local path: $p"; exit 0 ;;
+esac
 
 # Tilde expansion. Ghostty had the same bug (ghostty-org/ghostty#10863):
 # URL(filePath:) treats "~" as a literal directory.
