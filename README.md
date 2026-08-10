@@ -60,9 +60,21 @@ printf '{"id":"1","method":"plugin.enable","params":{"plugin_id":"finder-reveal"
 # remove
 printf '{"id":"1","method":"plugin.unlink","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H
 
-# what the action actually did, with exit code and stderr
+# what the action decided — stdout names the resolved path
 printf '{"id":"1","method":"plugin.log.list","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H | jq
 ```
+
+`stdout` is the plugin's verdict, one line per invocation:
+
+| line | meaning |
+|---|---|
+| `reveal: /path` | file revealed in Finder |
+| `open dir: /path` | directory opened |
+| `skip: no such path: …` | the matched text resolved to nothing on disk |
+| `skip: relative path, no pane cwd: …` | relative match, cwd unknown |
+
+The exit code alone proves nothing: the skip branches also exit 0, so a stray match
+stays silent. Read the line, not the status.
 
 Invoke it without clicking, to test the chain:
 

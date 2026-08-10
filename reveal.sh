@@ -7,8 +7,12 @@
 #   HERDR_PLUGIN_CONTEXT_JSON  full context, incl. focused_pane_cwd
 set -eu
 
+# Herdr captures stdout into the plugin log, so every exit path states its
+# decision. Otherwise exit 0 cannot be told apart from a silent no-op.
+say() { printf '%s\n' "$*"; }
+
 p="${HERDR_PLUGIN_CLICKED_URL:-}"
-[ -n "$p" ] || exit 0
+[ -n "$p" ] || { say "skip: no clicked url"; exit 0; }
 
 # Tilde expansion. Ghostty had the same bug (ghostty-org/ghostty#10863):
 # URL(filePath:) treats "~" as a literal directory.
@@ -26,7 +30,7 @@ case "$p" in
       base=$(printf '%s' "$HERDR_PLUGIN_CONTEXT_JSON" |
         sed -n 's/.*"focused_pane_cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     fi
-    [ -n "$base" ] || exit 0
+    [ -n "$base" ] || { say "skip: relative path, no pane cwd: $p"; exit 0; }
     p="$base/${p#./}"
     ;;
 esac
@@ -43,11 +47,13 @@ fi
 
 # The existence check is also what keeps a URL-embedded segment such as
 # https://host/tmp/x from firing: /tmp/x has to exist locally to match.
-[ -e "$p" ] || exit 0
+[ -e "$p" ] || { say "skip: no such path: $p"; exit 0; }
 
 # A directory is more useful opened than revealed in its parent.
 if [ -d "$p" ]; then
+  say "open dir: $p"
   exec /usr/bin/open "$p"
 else
+  say "reveal: $p"
   exec /usr/bin/open -R "$p"
 fi
