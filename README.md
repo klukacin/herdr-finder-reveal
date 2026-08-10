@@ -39,6 +39,25 @@ an OSC 8 hyperlink, which is what this plugin's pattern matches, either as a
 `file://` URI or as a path inside the link target. Plain text that merely looks
 like a path is not clickable, and no plugin can change that.
 
+Herdr also gives the link no visual affordance: it renders no underline and
+tracks no hover state (its binary carries no hover symbol at all). A clickable
+path and a dead one look identical, so verify with the log, not with the cursor.
+
+### Making paths clickable
+
+Use a producer that emits OSC 8. Both of these are Ctrl-clickable in a Herdr
+pane once this plugin is installed:
+
+```sh
+eza --hyperlink CHANGELOG.md      # file:///Users/you/repo/CHANGELOG.md
+gls --hyperlink=always            # file://host.local/Users/you/repo/CHANGELOG.md
+```
+
+`reveal.sh` handles both the empty-host and named-host forms, percent-encoded
+segments, and directory targets. Note that ripgrep only grew
+`--hyperlink-format` in 14.x mainline; the `rg 15.1.0` build on this machine
+rejects the flag.
+
 Every invocation prints its verdict to the plugin log:
 
 ```sh
