@@ -1,7 +1,7 @@
 id = "klukacin.finder-reveal"
 name = "Finder Reveal"
 description = "Reveal a Ctrl-clicked local file path in Finder"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.7.5"
 platforms = ["macos"]
 
