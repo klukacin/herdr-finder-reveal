@@ -1,124 +1,94 @@
 # herdr-finder-reveal
 
-Click a local file path in a [Herdr](https://github.com/herdrdev/herdr) pane, get it revealed in Finder.
+Ctrl-click a local file path in a [Herdr](https://github.com/herdrdev/herdr) pane
+and it is revealed in Finder.
 
 Agent and compiler output is full of paths — `src/config/url.zig:42:10`,
-`~/.config/herdr/config.toml`, `/Users/you/projects/app/README.md`. This plugin makes
-them clickable and hands them to Finder.
+`~/.config/herdr/config.toml`, `/Users/you/projects/app/README.md`. This plugin
+hands them to Finder instead of to a browser or a text editor.
 
-- Files are revealed and selected (`open -R`).
-- Directories are opened (`open`).
-- `~/…` is expanded, relative paths resolve against the cwd of the pane you clicked in.
+- Files are revealed and selected (`open -R`). Directories are opened (`open`).
+- `file://host/path` URLs are percent-decoded, and the host is dropped.
+- `~` is expanded; relative paths resolve against the cwd of the pane you clicked in.
 - A trailing `:line` or `:line:col` is stripped, so `foo.rs:42:10` still lands on `foo.rs`.
-
-macOS only.
-
-## Why a plugin
-
-The terminal cannot do this for you inside Herdr:
-
-- **Ghostty** detects file paths natively, but opens them with `NSWorkspace.open` — the
-  default *application*, not Finder. Its custom `link` regex is not wired up either:
-  setting it fails with `error.NotImplemented`, and `man 5 ghostty` says
-  `TODO: This can't currently be set`.
-- Even if it were, the click never reaches the terminal. Herdr defaults to
-  `mouse_capture = true` and owns the mouse, so the pane multiplexer has to handle it.
-
-Herdr's plugin system exposes exactly the missing piece: a `link_handlers` entry maps a
-regex to an action.
+- macOS only.
 
 ## Install
 
-Herdr has no `plugin` CLI subcommand as of 0.7.5 — the plugin API lives on the control
-socket. Clone, then link:
+```sh
+herdr plugin install klukacin/herdr-finder-reveal
+herdr plugin list
+```
+
+Requires Herdr 0.7.5 or newer. To hack on it locally, clone and link the working
+directory instead:
 
 ```sh
-git clone https://github.com/klukacin/herdr-finder-reveal.git \
-  ~/.config/herdr/plugins/herdr-finder-reveal
-
-printf '{"id":"1","method":"plugin.link","params":{"path":"%s","enabled":true}}\n' \
-  "$HOME/.config/herdr/plugins/herdr-finder-reveal" \
-  | nc -U ~/.config/herdr/herdr.sock
+herdr plugin link /path/to/herdr-finder-reveal
 ```
 
-Then click a path in any pane.
+## Use
 
-## Managing it
+**Ctrl+click** the path. Control is Herdr's modified-click modifier on every
+platform, including macOS: captured terminal mouse reports cannot expose
+Command/Super separately from a plain click, so `⌘+click` never reaches Herdr.
 
-`params` is mandatory on every request, even when empty.
+Herdr only makes **OSC 8 hyperlinks** clickable — it has no plain-text link
+scanner. A path is therefore a target when the program that printed it emitted
+an OSC 8 hyperlink, which is what this plugin's pattern matches, either as a
+`file://` URI or as a path inside the link target. Plain text that merely looks
+like a path is not clickable, and no plugin can change that.
+
+Every invocation prints its verdict to the plugin log:
 
 ```sh
-H=~/.config/herdr/herdr.sock
-
-# list
-printf '{"id":"1","method":"plugin.list","params":{}}\n' | nc -U $H | jq
-
-# disable / enable
-printf '{"id":"1","method":"plugin.disable","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H
-printf '{"id":"1","method":"plugin.enable","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H
-
-# remove
-printf '{"id":"1","method":"plugin.unlink","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H
-
-# what the action decided — stdout names the resolved path
-printf '{"id":"1","method":"plugin.log.list","params":{"plugin_id":"finder-reveal"}}\n' | nc -U $H | jq
+herdr plugin log list --plugin klukacin.finder-reveal
 ```
 
-`stdout` is the plugin's verdict, one line per invocation:
-
-| line | meaning |
-|---|---|
-| `reveal: /path` | file revealed in Finder |
-| `open dir: /path` | directory opened |
-| `skip: no such path: …` | the matched text resolved to nothing on disk |
-| `skip: relative path, no pane cwd: …` | relative match, cwd unknown |
-
-The exit code alone proves nothing: the skip branches also exit 0, so a stray match
-stays silent. Read the line, not the status.
-
-Invoke it without clicking, to test the chain:
-
-```sh
-printf '{"id":"1","method":"plugin.action.invoke","params":{"plugin_id":"finder-reveal","action_id":"reveal","context":{"clicked_url":"%s"}}}\n' \
-  "$PWD/README.md" | nc -U ~/.config/herdr/herdr.sock
+```
+reveal: /path              file revealed in Finder
+open dir: /path            directory opened
+skip: not a local path     the clicked URL carries a scheme other than file://
+skip: no such path         nothing at that path on disk
+skip: relative path, no pane cwd
 ```
 
-## How it works
+Exit status alone proves nothing: a silent no-op also exits 0. Read the line,
+not the status.
 
-`herdr-plugin.toml` declares one action and one link handler:
+## Why a plugin
 
-```toml
-[[actions]]
-id = "reveal"
-command = ["/bin/sh", "-c", "exec \"$HERDR_PLUGIN_ROOT/reveal.sh\""]
+The terminal cannot do this for you inside Herdr.
 
-[[link_handlers]]
-id = "local-path"
-action = "reveal"
-pattern = "…"
-```
+- **Ghostty** detects file paths natively, but opens them with
+  `NSWorkspace.open` — the default *application*, not Finder. Its custom `link`
+  regex is not wired up either: setting it fails with `error.NotImplemented`,
+  and `man 5 ghostty` says `TODO: This can't currently be set!`
+- Even if it were, the click never reaches the terminal. Herdr defaults to
+  `mouse_capture = true` and owns the mouse.
 
-The `sh -c` wrapper is required: `command` is argv, executed directly, so nothing
-expands `$HERDR_PLUGIN_ROOT` unless a shell does it.
+## Context
 
-Context arrives through the environment, not argv:
+Herdr passes invocation context through the environment, not argv:
 
-| variable | meaning |
-|---|---|
+| Variable | Meaning |
+| --- | --- |
 | `HERDR_PLUGIN_CLICKED_URL` | the matched text that was clicked |
 | `HERDR_PLUGIN_LINK_HANDLER_ID` | which handler matched |
 | `HERDR_PLUGIN_ROOT` | plugin directory |
 | `HERDR_ACTIVE_PANE_CWD` | cwd of the pane clicked in |
 | `HERDR_PLUGIN_CONTEXT_JSON` | full context, incl. `focused_pane_cwd` |
 
+`HERDR_ACTIVE_PANE_CWD` is not part of the documented plugin contract, so
+`reveal.sh` falls back to `focused_pane_cwd` from `HERDR_PLUGIN_CONTEXT_JSON`.
+
 ## Caveat: no look-around
 
-Herdr compiles patterns with the Rust [`regex`](https://docs.rs/regex) crate, which has
-no look-behind. A path therefore cannot be excluded by what precedes it, so the
-`/tmp/…` branch also matches inside a URL like `https://host/tmp/x`.
-
-`reveal.sh` compensates by requiring the resolved path to exist on disk. A URL segment
-only misfires if the same path happens to exist locally.
+Herdr compiles patterns with the Rust [`regex`](https://docs.rs/regex) crate,
+which has no look-behind. A path therefore cannot be excluded by what precedes
+it, so the bare-path branch also matches inside a URL such as
+`https://host/tmp/x`. `reveal.sh` rejects scheme-bearing input before any path
+handling, and still requires the resolved path to exist on disk.
 
 ## License
 

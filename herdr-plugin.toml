@@ -1,5 +1,6 @@
-id = "finder-reveal"
-name = "finder-reveal"
+id = "klukacin.finder-reveal"
+name = "Finder Reveal"
+description = "Reveal a Ctrl-clicked local file path in Finder"
 version = "0.1.0"
 min_herdr_version = "0.7.5"
 platforms = ["macos"]
@@ -19,4 +20,4 @@ id = "local-path"
 title = "Reveal in Finder"
 action = "reveal"
 platforms = ["macos"]
-pattern = "(?:~|\\.\\.?)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}|/(?:Users|Applications|Volumes|opt|tmp|var|etc|private)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}"
+pattern = "file://[A-Za-z0-9._~%@+:/-]+|(?:~|\\.\\.?)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}|/(?:Users|Applications|Volumes|opt|tmp|var|etc|private)/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)*(?::[0-9]+){0,2}"
